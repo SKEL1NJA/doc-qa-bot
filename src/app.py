@@ -24,13 +24,16 @@ def get_embedding(text: str) -> list[float]:
 
 
 def build_vector_store(pdf_path: str):
+    text = extract_text_from_pdf(pdf_path)
+
+    if not text.strip():
+        raise ValueError("No extractable text found in this PDF. It may be a scanned image without a text layer.")
+
     client = chromadb.PersistentClient(path="chroma_db")
     client.delete_collection(COLLECTION_NAME) if COLLECTION_NAME in [c.name for c in client.list_collections()] else None
     collection = client.create_collection(name=COLLECTION_NAME)
 
-    text = extract_text_from_pdf(pdf_path)
     chunks = chunk_text(text)
-
     ids = [f"chunk_{i}" for i in range(len(chunks))]
     embeddings = [get_embedding(chunk) for chunk in chunks]
 
@@ -46,7 +49,7 @@ def retrieve_relevant_chunks(query: str, n_results: int = 3) -> list[str]:
     return results["documents"][0]
 
 
-def answer_question(query: str) -> str:
+def answer_question(query: str) -> tuple[str, list[str]]:
     chunks = retrieve_relevant_chunks(query)
     context = "\n\n".join(chunks)
     system_message = SYSTEM_PROMPT.format(context=context)
@@ -58,7 +61,7 @@ def answer_question(query: str) -> str:
             {"role": "user", "content": query}
         ]
     )
-    return response["message"]["content"]
+    return response["message"]["content"], chunks
 
 
 st.set_page_config(page_title="Document QA Bot")
@@ -75,14 +78,28 @@ if uploaded_file is not None:
         f.write(uploaded_file.getbuffer())
 
     if st.button("Process document"):
-        with st.spinner("Extracting, chunking, and embedding..."):
-            build_vector_store(temp_path)
-        st.session_state.vector_store_ready = True
-        st.success("Document processed. Ask away.")
+        try:
+            with st.spinner("Extracting, chunking, and embedding..."):
+                build_vector_store(temp_path)
+            st.session_state.vector_store_ready = True
+            st.success("Document processed. Ask away.")
+        except ValueError as e:
+            st.error(str(e))
+        except Exception as e:
+            st.error(f"Failed to process document: {e}")
 
 if st.session_state.vector_store_ready:
     query = st.text_input("Ask a question about the document")
     if query:
-        with st.spinner("Thinking..."):
-            answer = answer_question(query)
-        st.write(answer)
+        try:
+            with st.spinner("Thinking..."):
+                answer, sources = answer_question(query)
+            st.write(answer)
+
+            with st.expander("View source chunks used"):
+                for i, chunk in enumerate(sources, start=1):
+                    st.markdown(f"**Chunk {i}:**")
+                    st.text(chunk)
+        except Exception as e:
+            st.error(f"Something went wrong while answering: {e}")
+            st.info("Make sure Ollama is running (ollama serve) and the models are pulled.")
