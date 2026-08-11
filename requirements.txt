@@ -2,3 +2,5 @@ pypdf
 chromadb
 ollama
 langchain-text-splitters
+streamlit
+cryptography
