@@ -6,7 +6,7 @@ about an uploaded PDF, grounded strictly in the document's content.
 Supports two modes: fully local (via Ollama, no API key, no cost) for development,
 or Gemini API (free tier, no credit card required) for deployment.
 
-**Live demo:** _add link here after deploying_
+**Live demo:** https://pdf-question-answer-bot.streamlit.app/
 
 ## How it works
 
