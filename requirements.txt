@@ -4,3 +4,5 @@ ollama
 langchain-text-splitters
 streamlit
 cryptography
+google-generativeai
+python-dotenv

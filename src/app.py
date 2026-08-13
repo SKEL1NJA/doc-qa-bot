@@ -2,11 +2,9 @@ import os
 import streamlit as st
 from extract import extract_text_from_pdf
 from chunk import chunk_text
+from llm_provider import get_embedding, chat
 import chromadb
-import ollama
 
-EMBED_MODEL = "nomic-embed-text"
-CHAT_MODEL = "llama3.1"
 COLLECTION_NAME = "documents"
 
 SYSTEM_PROMPT = """You are a document QA assistant. Answer the user's question using ONLY the context provided below.
@@ -16,11 +14,6 @@ Do not use outside knowledge. Do not make up information.
 Context:
 {context}
 """
-
-
-def get_embedding(text: str) -> list[float]:
-    response = ollama.embeddings(model=EMBED_MODEL, prompt=text)
-    return response["embedding"]
 
 
 def build_vector_store(pdf_path: str):
@@ -53,15 +46,8 @@ def answer_question(query: str) -> tuple[str, list[str]]:
     chunks = retrieve_relevant_chunks(query)
     context = "\n\n".join(chunks)
     system_message = SYSTEM_PROMPT.format(context=context)
-
-    response = ollama.chat(
-        model=CHAT_MODEL,
-        messages=[
-            {"role": "system", "content": system_message},
-            {"role": "user", "content": query}
-        ]
-    )
-    return response["message"]["content"], chunks
+    answer = chat(system_message, query)
+    return answer, chunks
 
 
 st.set_page_config(page_title="Document QA Bot")
@@ -102,4 +88,4 @@ if st.session_state.vector_store_ready:
                     st.text(chunk)
         except Exception as e:
             st.error(f"Something went wrong while answering: {e}")
-            st.info("Make sure Ollama is running (ollama serve) and the models are pulled.")
+            st.info("If using Ollama, make sure it's running. If using Gemini, check your API key.")
